@@ -1,0 +1,2 @@
+#pragma once
+namespace kukri { inline constexpr auto version = "@PROJECT_VERSION@"; }

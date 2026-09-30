@@ -20,7 +20,8 @@ ctest --test-dir build -C Release --output-on-failure
 MSVC produces `build/Release/kukri.exe`. Single-configuration generators normally
 produce `build/kukri` (or `.exe`); configure those with `-DCMAKE_BUILD_TYPE=Release`.
 Only Windows/MSVC has been validated locally; other platforms need native testing.
-The default MSVC build uses the dynamic Visual C++ runtime.
+The default MSVC build links the Visual C++ runtime statically for portable
+Windows packages. Set `-DKUKRI_STATIC_MSVC_RUNTIME=OFF` to use the dynamic runtime.
 
 Windows per-user install, in PowerShell:
 
@@ -43,7 +44,8 @@ use `/usr/local`; distribution packages use their own prefix, commonly `/usr`.
 CMake installs the executable to `<prefix>/bin` and README/LICENSE to
 `<prefix>/share/doc/kukri`. Packagers can override GNUInstallDirs destinations and
 use POSIX `DESTDIR` staging. Installation does not edit PATH or enable repositories.
-There are no published packages or automated releases in this project yet.
+CI produces tested downloadable build artifacts; it does not publish releases.
+There are no package-manager listings yet.
 
 ## Use
 
@@ -182,3 +184,46 @@ Kukri has no note storage or recovery. Its internal identity smudge command copi
 bytes unchanged for checkout compatibility; it cannot reconstruct notes.
 
 MIT licensed. See [LICENSE](LICENSE).
+
+## CI and preview packages
+
+The GitHub Actions workflow runs on pushes, pull requests, and manual dispatch.
+It targets Windows x64 (MSVC on Windows Server 2022), Ubuntu 24.04 x64 (GCC and
+Clang), and macOS 15 ARM64. These are validation targets, not a claim that remote
+runs have already passed or that every newer OS is supported. Windows 11 desktop
+installation still needs a manual smoke test; Linux packages do not promise
+compatibility with older glibc/libstdc++ versions or every distribution. macOS
+archives are unsigned and not notarized, so they remain developer previews.
+
+CI requires Python, Git, and Node, runs all four CTest suites, then tests extracted
+archives using the real Git integration suite. Ubuntu/GCC additionally builds,
+installs, tests, and removes a Debian package. Existing integration tests simulate
+stable-path upgrades; a genuine old-release-to-new-release package upgrade test
+will be added once a previous published package exists.
+
+Successful package jobs upload artifacts under **Actions ? workflow run ? Artifacts**:
+Windows ZIP, Linux/macOS tarballs, Ubuntu `.deb`, and SHA-256 checksums. Artifacts
+expire after 14 days and are not permanent release URLs. The workflow has read-only
+repository permissions and does not publish releases, push commits, or modify
+package-manager repositories.
+
+To build and inspect an archive locally after building and testing:
+
+```sh
+cd build
+cpack -C Release
+cd ..
+python tests/package_smoke.py build/packages
+python tests/package_smoke.py build/packages --checksums-only
+```
+
+On Ubuntu with `dpkg-dev` installed, use `cpack -C Release -G DEB` from the build
+directory. Dependency discovery adds the required runtime libraries; Git is an
+explicit dependency. Archive users must install Git separately. Package generation
+uses CMake installation rules and ships only the executable, README, and LICENSE.
+The ignored learning docs, tests, and build files are excluded. Source archive
+generation is disabled pending a separately reviewed source allowlist.
+
+`project(... VERSION ...)` in CMakeLists.txt is the version authority; both the
+executable header and CPack metadata are generated from it. CI-style dependency
+checks can be enabled locally with `-DKUKRI_REQUIRE_TEST_DEPENDENCIES=ON`.
