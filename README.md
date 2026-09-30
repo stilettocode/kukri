@@ -187,6 +187,30 @@ MIT licensed. See [LICENSE](LICENSE).
 
 ## CI and preview packages
 
+### Support matrix
+
+The planned official targets are Windows 11 x64, Ubuntu 24.04 LTS x64, and
+macOS 15+ ARM64. A target becomes official after its remote CI job and required
+package or desktop smoke tests pass. The support baseline is the oldest
+platform we build and test; newer operating systems are forward-tested when
+available.
+
+| Platform | Architecture | Minimum baseline | CI evidence | Packages |
+| --- | --- | --- | --- | --- |
+| Windows | x64 | Windows 11 | MSVC on pinned `windows-2022`; manual Windows 11 smoke test before release | ZIP |
+| Ubuntu | x64 | Ubuntu 24.04 LTS | GCC and Clang on pinned `ubuntu-24.04`; package smoke test on GCC | tar.gz, DEB |
+| macOS | ARM64 | macOS 15 | Clang on pinned `macos-15`; deployment target 15.0 | tar.gz |
+
+Kukri requires Git 2.31 or newer. CI also requires Python 3.9 or newer and
+Node.js for the language and integration tests. Windows 10, Intel macOS, other
+Linux distributions, and other architectures are best effort rather than
+official release targets. Windows 10 reached end of support on October 14, 2025.
+
+The matrix is reviewed when a baseline reaches end of support, when a new LTS
+or major operating-system release arrives, and before each release. Runner
+labels remain pinned; a newer runner is evidence for forward compatibility, not
+an automatic change to the minimum supported baseline.
+
 The GitHub Actions workflow runs on pushes, pull requests, and manual dispatch.
 It targets Windows x64 (MSVC on Windows Server 2022), Ubuntu 24.04 x64 (GCC and
 Clang), and macOS 15 ARM64. These are validation targets, not a claim that remote
