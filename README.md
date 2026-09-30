@@ -201,7 +201,7 @@ installs, tests, and removes a Debian package. Existing integration tests simula
 stable-path upgrades; a genuine old-release-to-new-release package upgrade test
 will be added once a previous published package exists.
 
-Successful package jobs upload artifacts under **Actions ? workflow run ? Artifacts**:
+Successful package jobs upload artifacts under **Actions > workflow run > Artifacts**:
 Windows ZIP, Linux/macOS tarballs, Ubuntu `.deb`, and SHA-256 checksums. Artifacts
 expire after 14 days and are not permanent release URLs. The workflow has read-only
 repository permissions and does not publish releases, push commits, or modify
