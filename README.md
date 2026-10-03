@@ -44,8 +44,15 @@ use `/usr/local`; distribution packages use their own prefix, commonly `/usr`.
 CMake installs the executable to `<prefix>/bin` and README/LICENSE to
 `<prefix>/share/doc/kukri`. Packagers can override GNUInstallDirs destinations and
 use POSIX `DESTDIR` staging. Installation does not edit PATH or enable repositories.
-CI produces tested downloadable build artifacts; it does not publish releases.
-There are no package-manager listings yet.
+Tagged releases are published as draft GitHub Releases after the platform build,
+test, archive smoke test, and (on Ubuntu) Debian install test pass. Release assets
+include the Windows ZIP, Linux and macOS tarballs, the Ubuntu DEB, and a
+`SHA256SUMS` file. Download assets from the repository's Releases page rather than
+from the Actions artifact list; Actions artifacts are temporary.
+
+macOS release archives are currently unsigned and unnotarized developer previews.
+Gatekeeper may require an explicit user action, and macOS is not advertised as a
+polished installation experience yet. There are no package-manager listings.
 
 ## Use
 

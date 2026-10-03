@@ -1,0 +1,132 @@
+name: Build and publish draft release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64-msvc
+            os: windows-2022
+            cmake_args: -A x64
+          - name: linux-x64-gcc
+            os: ubuntu-24.04
+            cmake_args: -DCMAKE_CXX_COMPILER=g++
+          - name: macos-arm64-clang
+            os: macos-15
+            cmake_args: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++ cmake git dpkg-dev
+      - name: Check macOS architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = arm64
+      - name: Validate release tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          match = re.fullmatch(r"v(\d+\.\d+\.\d+)", tag)
+          if not match:
+              raise SystemExit(f"Release tags must look like vMAJOR.MINOR.PATCH: {tag}")
+          version = re.search(r"project\(kukri VERSION ([0-9.]+)", Path("CMakeLists.txt").read_text())
+          if not version or version.group(1) != match.group(1):
+              actual = version.group(1) if version else "unknown"
+              raise SystemExit(f"Tag {tag} does not match the CMake version {actual}")
+          PY
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DKUKRI_REQUIRE_TEST_DEPENDENCIES=ON ${{ matrix.cmake_args }}
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 300
+      - name: Build archive
+        working-directory: build
+        run: cpack -C Release
+      - name: Test extracted archive
+        run: python tests/package_smoke.py build/packages
+      - name: Build Debian package
+        if: matrix.name == 'linux-x64-gcc'
+        working-directory: build
+        run: cpack -C Release -G DEB
+      - name: Install and test Debian package
+        if: matrix.name == 'linux-x64-gcc'
+        run: |
+          sudo apt-get install -y ./build/packages/*.deb
+          python tests/integration.py /usr/bin/kukri "$(command -v git)"
+          sudo apt-get remove -y kukri
+          test ! -e /usr/bin/kukri
+      - name: Upload tested packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: kukri-${{ matrix.name }}
+          path: |
+            build/packages/*.zip
+            build/packages/*.tar.gz
+            build/packages/*.deb
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.name }}
+          path: build/Testing/Temporary/
+          if-no-files-found: ignore
+
+  draft-release:
+    name: Create draft GitHub Release
+    runs-on: ubuntu-24.04
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kukri-*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate release checksums
+        working-directory: release-assets
+        run: sha256sum *.zip *.tar.gz *.deb > SHA256SUMS
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --draft \
+            --generate-notes \
+            --title "Kukri $GITHUB_REF_NAME" \
+            --verify-tag
